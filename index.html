@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>WebSocket Chat</title>
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+        body {
+          font-family: Arial, sans-serif;
+          margin: 0;
+          padding: 0;
+          background-color: #f0f0f0;
+          display: flex;
+          flex-direction: column;
+          justify-content: center;
+          align-items: center;
+          height: 100vh;
+      }
+        #chatbox {
+            width: 100%;
+            max-width: 600px;
+            height: 400px;
+            border: 1px solid #ddd;
+            background-color: #fff;
+            overflow-y: scroll;
+            padding: 20px;
+            margin-bottom: 20px;
+            border-radius: 10px;
+        }
+        #message {
+            width: 100%;
+            max-width: 600px;
+            padding: 10px;
+            border-radius: 10px;
+            border: 1px solid #ddd;
+        }
+        .outgoing {
+          background-color: lightgreen;
+          padding: 10px;
+          margin: 10px 0;
+          border-radius: 10px;
+          text-align: right;
+          width: fit-content;
+          margin-left: auto;
+      }
+      
+      .incoming {
+          background-color: lightgray;
+          padding: 10px;
+          margin: 10px 0;
+          border-radius: 10px;
+          text-align: left;
+          width: fit-content;
+          margin-right: auto;
+      }
+    </style>
+</head>
+<body>
+    <div id="chatbox"></div>
+    <input id="message" type="text" placeholder="Type a message...">
+    <script>
+	var ws = new WebSocket('ws://localhost:3000/ws');
+	var username = prompt('Enter your username');
+	
+	ws.onopen = function() {
+		console.log('Connected to server.');
+	};
+	
+	ws.onmessage = function(event) {
+    var chatbox = document.getElementById('chatbox');
+    var message = JSON.parse(event.data);
+    var messageElement = document.createElement('p');
+    messageElement.textContent = message.text;
+    if (message.username === username) {
+        messageElement.className = 'outgoing';
+    } else {
+        messageElement.className = 'incoming';
+    }
+    chatbox.appendChild(messageElement);
+};
+
+var input = document.getElementById('message');
+input.addEventListener('keypress', function(event) {
+    if (event.key === 'Enter') {
+        var message = {
+            username: username,
+            text: input.value
+        };
+        ws.send(JSON.stringify(message));
+        input.value = '';
+    }
+});
+    </script>
+</body>
+</html>

@@ -1,57 +1,60 @@
 package main
 
 import (
-	"fmt"
 	"io"
 	"net/http"
 
 	"golang.org/x/net/websocket"
 )
 
+type Client struct {
+	Conn *websocket.Conn
+}
+
 type Server struct {
-	conn map[*websocket.Conn]bool
+	Clients map[*Client]bool
 }
 
 func NewServer() *Server {
 	return &Server{
-		make(map[*websocket.Conn]bool),
+		make(map[*Client]bool),
 	}
 }
 
 func (s *Server) HandleWs(ws *websocket.Conn) {
-	fmt.Println("new conn from ", ws.RemoteAddr())
-	s.conn[ws] = true
-	s.rLoop(ws)
+	defer ws.Close()
+	client := &Client{
+		Conn: ws,
+	}
+	s.Clients[client] = true
+	s.HandleMessages(client)
 }
 
-func (s *Server) rLoop(ws *websocket.Conn) {
-	buff := make([]byte, 1024)
+func (s *Server) HandleMessages(client *Client) {
 	for {
-		n, err := ws.Read(buff)
+		var msg string
+		err := websocket.Message.Receive(client.Conn, &msg)
 		if err != nil {
 			if err == io.EOF {
-				fmt.Println("Connection closed from ", ws.LocalAddr())
-				break
+				delete(s.Clients, client)
 			}
-			fmt.Println("Err occured with message:", err)
-			continue
+			break
 		}
-		msg := buff[:n]
-		go s.broadcast(msg)
-	}
-}
-
-func (s *Server) broadcast(b []byte) {
-	for ws := range s.conn {
-		_, err := ws.Write(b)
-		if err != nil {
-			fmt.Println("err while writing:", err)
+		for client := range s.Clients {
+			err := websocket.Message.Send(client.Conn, msg)
+			if err != nil {
+				delete(s.Clients, client)
+			}
 		}
 	}
 }
 
 func main() {
-	s := NewServer()
-	http.Handle("/chat", websocket.Handler(s.HandleWs))
-	http.ListenAndServe(":3000", nil)
+	server := NewServer()
+
+	http.Handle("/ws", websocket.Handler(server.HandleWs))
+	err := http.ListenAndServe(":3000", nil)
+	if err != nil {
+		panic(err.Error())
+	}
 }
